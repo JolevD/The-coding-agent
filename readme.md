@@ -98,7 +98,7 @@ This project exposes a REST API that accepts user prompts, generates tool-format
 ```bash
 curl -X POST http://localhost:3000/agent \
      -H "Content-Type: application/json" \
-     -d '{"prompt": "Install Node.js, clone my repo, and run tests."}'
+     -d '{"prompt": "open browser, go to wikipedia.com and take a screenshot"}'
 
 # Returns jobId
 curl http://localhost:3000/status/<jobId>
