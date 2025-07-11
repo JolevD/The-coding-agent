@@ -1,7 +1,0 @@
-{
-  "plan": [
-    "mkdir hello_world_project",
-    "cat > hello_world_project/hello.js << 'EOF'\nconsole.log(\"Hello, World!\");\nEOF"
-  ],
-  "time": 1751038822655
-}

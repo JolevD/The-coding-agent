@@ -1,4 +1,3 @@
-// agent-api/index.js
 const express = require('express');
 const { exec } = require('child_process');
 const fs = require('fs');
@@ -7,7 +6,7 @@ const axios = require('axios');
 const app = express();
 const crypto = require('crypto');
 const { Anthropic } = require('@anthropic-ai/sdk');
-const { SYSTEM_PROMPT } = require('./prompts/system_prompt');
+const { SYSTEM_PROMPT, XDOT_AGENT_SYSTEM_PROMPT } = require('./prompts/system_prompt');
 require('dotenv').config()
 
 app.use(express.json());
@@ -38,10 +37,7 @@ function addContext(type, data) {
     );
 }
 
-/**
- * Retrieve the N most recent context entries.
- * You can bump N until you feel it fits within your LLM’s window.
- */
+
 function getRecentContext(n = 10) {
     return fs.readdirSync(CONTEXT_DIR)
         .sort()
@@ -50,82 +46,6 @@ function getRecentContext(n = 10) {
             fs.readFileSync(path.join(CONTEXT_DIR, f), 'utf-8')
         ));
 }
-
-
-// 🧠 Agent endpoint
-// app.post('/agent', async (req, res) => {
-//     const prompt = req.body.prompt;
-//     if (!prompt) return res.status(400).send('Missing prompt');
-
-//     // 1) Save user prompt to context
-//     addContext('user', { prompt, time: Date.now() });
-
-//     // 2) Build message history for Claude
-//     // const recent = getRecentContext(5);
-//     // // const messages = [
-//     // //     // You can insert a system message as the first item if you like:
-//     // //     // { role: 'system', content: SYSTEM_PROMPT },
-//     // //     // Inject saved memories as assistant messages:
-//     // //     ...recent.map(m => ({ role: 'assistant', content: JSON.stringify(m) })),
-//     // //     // Finally the user’s new prompt:
-//     // //     { role: 'user', content: prompt },
-//     // // ];
-
-//     // // 1) Build recent-memory assistant messages
-//     // const memoryMessages = recent.map(m => ({
-//     //     role: 'assistant',
-//     //     content: JSON.stringify(m)
-//     // }));
-
-//     // // 2) Build the user message
-//     // const userMessage = { role: 'user', content: prompt };
-
-//     // // 2) Build context summary for Claude
-//     // const recent = getRecentContext(5);
-//     // const contextSummary = recent.map(ctx =>
-//     //     `[${ctx.type}] ${JSON.stringify(ctx.data)}`
-//     // ).join('\n');
-
-
-
-//     // // 3) Call Anthropic Claude
-//     let planText;
-//     try {
-//         const resp = await anthropic.messages.create({
-//             model: 'claude-opus-4-20250514',
-//             max_tokens: 1024,
-//             system: SYSTEM_PROMPT, // Move system prompt here
-//             messages: [
-//                 {
-//                     role: 'user',
-//                     content: prompt + ` [${Math.random()}]`
-//                 }
-//             ]
-//         });
-//         planText = resp.content[0].text.trim();
-//     } catch (err) {
-//         return res.status(500).send('Claude call failed: ' + err.message);
-//     }
-
-//     // 4) Save the plan back into context
-//     addContext('plan', { plan: planText, time: Date.now() });
-
-//     // 5) Split into commands and schedule each one
-//     const commands = planText
-//         .split('\n')
-//         .map(l => l.trim())
-//         .filter(l => l && !l.startsWith('#'));
-
-//     const jobIds = [];
-//     for (const cmd of commands) {
-//         const { data } = await axios.post('http://localhost:3000/schedule', { cmd });
-//         jobIds.push(data.jobId);
-//     }
-
-//     // 6) Return the plan and the jobs
-//     res.json({ plan: commands, jobIds });
-// });
-
 
 
 app.post('/agent', async (req, res) => {
@@ -186,16 +106,8 @@ app.post('/agent', async (req, res) => {
 
             const combinedScript = commands.join('\n');
 
-
-            // // Schedule the commands
-            // const jobIds = [];
-            // for (const cmd of commands) {
-            //     const { data } = await axios.post('http://localhost:3000/schedule', { cmd });
-            //     jobIds.push(data.jobId);
-            // }
-
             // schedule one container to run the entire script
-            const { data } = await axios.post('http://localhost:3000/schedule', {
+            const { data } = await axios.post('http://127.0.0.1:3000/schedule', {
                 cmd: combinedScript
             });
             res.json({
@@ -222,46 +134,8 @@ app.post('/agent', async (req, res) => {
 
 
 
-
-// const JOBS_DIR = path.join(__dirname, 'jobs');
-
-// if (!fs.existsSync(JOBS_DIR)) fs.mkdirSync(JOBS_DIR);
-
-// app.post('/schedule', (req, res) => {
-//     const task = req.body.cmd;
-//     if (!task) return res.status(400).send("Missing 'cmd'");
-
-//     const jobId = crypto.randomUUID();
-//     const jobPath = path.join(JOBS_DIR, jobId);
-//     fs.mkdirSync(jobPath);
-
-//     const taskPath = path.join(jobPath, 'task.json');
-//     fs.writeFileSync(taskPath, JSON.stringify({ cmd: task, status: 'pending' }));
-
-//     const statusPath = path.join(jobPath, 'status.txt');
-//     const outputPath = path.join(jobPath, 'output.txt');
-//     const errorPath = path.join(jobPath, 'error.txt');
-
-//     fs.writeFileSync(statusPath, 'running');
-//     fs.writeFileSync(outputPath, '');
-//     fs.writeFileSync(errorPath, '');
-
-//     // ✅ Direct shell execution
-//     exec(task, (err, stdout, stderr) => {
-//         if (err) {
-//             fs.writeFileSync(statusPath, 'error');
-//             fs.writeFileSync(errorPath, stderr || err.message);
-//         } else {
-//             fs.writeFileSync(statusPath, 'done');
-//             fs.writeFileSync(outputPath, stdout.trim());
-//         }
-//     });
-
-//     res.json({ jobId });
-// });
-
 app.post('/schedule', async (req, res) => {
-    const script = req.body.cmd;                   // ← Changed from 'script' to 'cmd'
+    const script = req.body.cmd;
 
     if (!script) {
         return res.status(400).json({ error: 'Missing cmd parameter' });
@@ -320,7 +194,6 @@ app.post('/schedule', async (req, res) => {
 
             if (err) {
                 console.error(`Job ${jobId} failed:`, stderr);
-                // Don't return here - the response might already be sent
             } else {
                 console.log(`Job ${jobId} completed successfully`);
             }
@@ -476,6 +349,88 @@ app.post("/xdot", (req, res) => {
             return res.status(500).json({ error: stderr });
         }
         res.json({ status: "ok", output: stdout });
+    });
+});
+
+
+app.post('/xdot-agent', async (req, res) => {
+    const prompt = req.body.prompt;
+    if (!prompt) return res.status(400).send('Missing prompt');
+
+    // 1. Ask Claude to generate xdotool/shell commands for the prompt
+    let scriptText;
+    try {
+        const resp = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 512,
+            system: XDOT_AGENT_SYSTEM_PROMPT,
+            messages: [
+                { role: 'user', content: `Write a bash script to: ${prompt}` }
+            ]
+        });
+        scriptText = resp.content[0].text.trim();
+    } catch (err) {
+        return res.status(500).send('Claude call failed: ' + err.message);
+    }
+
+    // Clean up scriptText before writing to file
+    scriptText = scriptText
+        .replace(/```(bash)?/g, '') // remove ```bash or ```
+        .replace(/^#!\/bin\/bash\s*/gm, '') // remove any extra shebangs except the first
+        .trim();
+
+    // Ensure /tmp exists
+    if (!fs.existsSync('/tmp')) {
+        fs.mkdirSync('/tmp', { recursive: true });
+    }
+
+    // 2. Save the script to a file (add sleep before screenshot for reliability)
+    const scriptPath = '/tmp/xdot_script.sh';
+    const screenshotPath = '/tmp/xdot_screenshot.png';
+    // Add a sleep before the screenshot to ensure the GUI is ready
+    const scriptWithSleep = `#!/bin/bash
+export DISPLAY=:0
+${scriptText}
+sleep 5
+import -display :0 -window root ${screenshotPath}
+`;
+    fs.writeFileSync(scriptPath, scriptWithSleep);
+    fs.chmodSync(scriptPath, 0o755);
+
+    // Log for debugging
+    console.log('Generated script:\n', scriptWithSleep);
+    console.log('Script path:', scriptPath);
+    console.log('Screenshot path:', screenshotPath);
+
+    // 3. Run the script
+    exec(`${scriptPath}`, { timeout: 25000 }, (err, stdout, stderr) => {
+        console.log('stdout:', stdout);
+        console.log('stderr:', stderr);
+        if (err) {
+            console.error('Automation error:', err, stderr);
+            return res.status(500).json({
+                error: 'Automation or screenshot failed',
+                details: stderr,
+                script: scriptWithSleep
+            });
+        }
+        // Check if screenshot exists and send it
+        if (fs.existsSync(screenshotPath)) {
+            res.sendFile(screenshotPath, (err) => {
+                if (err) {
+                    console.error('Error sending file:', err);
+                    res.status(500).send('Error sending screenshot');
+                } else {
+                    console.log('Screenshot sent successfully');
+                }
+
+            });
+        } else {
+            return res.status(500).json({
+                error: 'Screenshot not found',
+                script: scriptWithSleep
+            });
+        }
     });
 });
 
