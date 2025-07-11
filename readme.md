@@ -67,13 +67,13 @@ This project exposes a REST API that accepts user prompts, generates tool-format
 2. Build the Docker images:
 
    ```bash
-   docker-compose build
+   docker build -t coding-agent .
    ```
 
 3. Start the services:
 
    ```bash
-   docker-compose up -d
+   docker run -it --rm -e ANTHROPIC_API_KEY="sk......." -p 8888:8888 -p 6080:6080 -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock -v /tmp/coding-agent-jobs:/home/agentuser/agent-api/jobs coding-agent
    ```
 
 ---
